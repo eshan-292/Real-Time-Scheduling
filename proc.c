@@ -7,6 +7,10 @@
 #include "proc.h"
 #include "spinlock.h"
 
+
+// Global variable for scheduling policy
+int sched_pol = 0 ;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -19,6 +23,7 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
 
 void
 pinit(void)
@@ -325,10 +330,65 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
+
+
+
+
+  // // Original code
   
+  // for(;;){
+    
+  //   // Enable interrupts on this processor.
+  //   sti();
+
+  //   // Loop over process table looking for process to run.
+  //   acquire(&ptable.lock);
+  //   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  //     if(p->state != RUNNABLE)
+  //       continue;
+
+
+
+  //     // Switch to chosen process.  It is the process's job
+  //     // to release ptable.lock and then reacquire it
+  //     // before jumping back to us.
+  //     c->proc = p;
+  //     switchuvm(p);
+  //     p->state = RUNNING;
+
+  //     swtch(&(c->scheduler), p->context);
+  //     switchkvm();
+
+  //     // Process is done running for now.
+  //     // It should have changed its p->state before coming back.
+  //     c->proc = 0;
+  //   }
+  //   release(&ptable.lock);
+
+  // }
+
+
+
+
+
+
+
+  // EDF
+
+  // Checking 
+  if(sched_pol==0){
+
   for(;;){
+    
     // Enable interrupts on this processor.
     sti();
+
+    // Process with the earliest deadline
+    struct proc *sup;
+    
+    // Initialise sup
+    sup->deadline=__INT_MAX__;
+
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
@@ -336,23 +396,53 @@ scheduler(void)
       if(p->state != RUNNABLE)
         continue;
 
+      if(p->deadline<sup->deadline){
+        sup=p;
+      }
+
+    }
+
+
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = p;
+      c->proc = sup;
       switchuvm(p);
-      p->state = RUNNING;
+      sup->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
+      swtch(&(c->scheduler), sup->context);
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-    }
+
+
+
     release(&ptable.lock);
 
   }
+
+
+  }
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -671,6 +761,7 @@ int set_policy(int pid, int policy){
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
       p->sched_policy = policy;
+      sched_pol = policy;
       release(&ptable.lock);
       return 0;
     }
