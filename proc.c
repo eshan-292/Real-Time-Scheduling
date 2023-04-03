@@ -94,6 +94,12 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  // Setting the parameters for the proc
+  p->deadline = 1000;
+  p->elapsed_time = 0;
+  p->wait_time = 0;
+  p->execution_time = 100;
+
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -129,6 +135,10 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
+
+  // setting the deadline and execution time for the init process
+  p->deadline = 1000;
+  p->execution_time = 500;
   
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
@@ -193,6 +203,14 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
+
+  // Setting the parameters for the proc
+  np->deadline = curproc->deadline;
+  np->elapsed_time = curproc->elapsed_time;
+  np->wait_time = curproc->wait_time;
+  np->execution_time = curproc->execution_time;
+
+  
 
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
@@ -341,20 +359,27 @@ scheduler(void)
   //   // Enable interrupts on this processor.
   //   sti();
 
+  //   // print hello
+  //   // cprintf("hello");
+
+
   //   // Loop over process table looking for process to run.
   //   acquire(&ptable.lock);
   //   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
   //     if(p->state != RUNNABLE)
   //       continue;
 
-
-
   //     // Switch to chosen process.  It is the process's job
   //     // to release ptable.lock and then reacquire it
   //     // before jumping back to us.
+
+  //     //print the process id 
+  //     cprintf("Process id is %d \n", p->pid);
   //     c->proc = p;
   //     switchuvm(p);
-  //     p->state = RUNNING;
+  //     p->state = RUNNING; // print all info about the process
+  //     cprintf("Process name is %s \n", p->name);
+
 
   //     swtch(&(c->scheduler), p->context);
   //     switchkvm();
@@ -372,6 +397,9 @@ scheduler(void)
 
 
 
+// print sched_pol
+
+  // cprintf("sched_pol is %d \n", sched_pol);
 
   // EDF
 
@@ -386,9 +414,28 @@ scheduler(void)
     // Process with the earliest deadline
     struct proc *sup;
     
-    // Initialise sup
-    sup->deadline=__INT_MAX__;
+    // print hello
+    // cprintf("Sup\n");
 
+    // Initialise sup
+    // sup->deadline=1000000;
+
+    int earliest_deadline=10000000;
+
+
+
+    // print hello
+    // cprintf("Hello\n");
+
+    // // print the ptable
+    // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    //   if(p->state != UNUSED){
+    //     cprintf("pid: %d, deadline: %d, elapsed_time: %d, wait_time: %d", p->pid, p->deadline, p->elapsed_time, p->wait_time);
+    //   }
+    // }
+
+
+    int flag= 0 ;
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
@@ -396,22 +443,81 @@ scheduler(void)
       if(p->state != RUNNABLE)
         continue;
 
-      if(p->deadline<sup->deadline){
+
+      // if(p->state != UNUSED){
+      //   cprintf("pid: %d, deadline: %d, elapsed_time: %d, wait_time: %d \n", p->pid, p->deadline, p->elapsed_time, p->wait_time);
+      // }
+      
+      // Check if the deadline is earlier than the current earliest deadline
+      if(p->deadline<earliest_deadline){
+        earliest_deadline=p->deadline;
         sup=p;
+        // print found process
+        // cprintf("Found process with pid %d \n", sup->pid);
+        flag =1 ;
       }
 
+
     }
+
+      if(flag==0){
+        release(&ptable.lock);
+          continue;
+      }
+
+
+
+
+
+      // print the process id
+      cprintf("Process id is %d \n", sup->pid);
+      //print the process name
+      cprintf("Process name is %s \n", sup->name);
+      // print the process deadline
+      cprintf("Process deadline is %d \n", sup->deadline);
+      // print the process elapsed time
+      cprintf("Process elapsed time is %d \n", sup->elapsed_time);
+      // print the process wait time
+      cprintf("Process wait time is %d \n", sup->wait_time);
+
+
+
+
+
 
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
+
+
+
       c->proc = sup;
-      switchuvm(p);
+      switchuvm(sup);
       sup->state = RUNNING;
+
+
+      
+    // update the elapsed time for running processes
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == RUNNING){
+        p->elapsed_time++;
+      }
+    }
+
+    // update the wait time for runnable processes
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == RUNNABLE){
+        p->wait_time++;
+      }
+    }
+
+
 
       swtch(&(c->scheduler), sup->context);
       switchkvm();
+
+
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -426,23 +532,6 @@ scheduler(void)
 
   }
   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
 
 // Enter scheduler.  Must hold only ptable.lock
