@@ -110,21 +110,20 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
 // If interrupts were on while locks held, would need to
 // check nlock.
-if(myproc() && myproc()->state == RUNNING &&
-tf->trapno == T_IRQ0+IRQ_TIMER)
-{
-if((myproc()->sched_policy >= 0) &&
-(myproc()->elapsed_time >= myproc()->execution_time) && myproc()->pid != 1 && myproc()->pid != 2   )
-{
-cprintf("The completed process has pid: %d\n",
-myproc()->pid);
-exit();
-}
-else
-yield();
-}
+  if(myproc() && myproc()->state == RUNNING && tf->trapno == T_IRQ0+IRQ_TIMER)
+  {
+    if(myproc()->sched_policy >= 0 &&  (myproc()->elapsed_time >= myproc()->execution_time))
+    {
+      cprintf("The completed process has pid: %d\n", myproc()->pid);
+      exit();
+    }
+    else
+      yield();
+  }
 
-
+  if(tf->trapno == T_IRQ0 + IRQ_TIMER){
+    timing_update();
+  }
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
