@@ -1041,8 +1041,7 @@ int set_policy(int pid, int policy){
     if(p->pid == pid){
       p->sched_policy = policy;
       
-      // Update the deadline
-      // p->deadline += ticks;
+      
 
       sched_pol = policy;
 
@@ -1058,6 +1057,10 @@ int set_policy(int pid, int policy){
         }
         // print util
         cprintf("Utilization: %d \n", util);
+
+
+      // Update the deadline
+      p->deadline += ticks;
 
         if(util > 1*1000){
           cprintf("Schedulability check failed. This process is not schedulable.\n");
